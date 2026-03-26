@@ -38,8 +38,11 @@ export default class DiffHistoryPlugin extends Plugin {
     );
     this.historyManager.setEventListener(this.eventListener);
 
-    // Real-time update: refresh sidebar when a diff is saved
+    // Real-time update: refresh sidebar when a diff is saved or initial snapshot created
     this.eventListener.onDiffSaved = (filePath) => {
+      this.refreshHistoryViewIfMatch(filePath);
+    };
+    this.eventListener.onSnapshotCreated = (filePath) => {
       this.refreshHistoryViewIfMatch(filePath);
     };
 
@@ -56,6 +59,20 @@ export default class DiffHistoryPlugin extends Plugin {
     this.registerView(VIEW_TYPE_DIFF_HISTORY, (leaf) => {
       return new DiffHistoryView(leaf, this);
     });
+
+    // Add "Show file history" to file context menu (⋮ button)
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (file instanceof TFile && file.extension === "md") {
+          menu.addItem((item) => {
+            item
+              .setTitle("Show diff history")
+              .setIcon("history")
+              .onClick(() => this.showHistory(file));
+          });
+        }
+      })
+    );
 
     // Auto-switch history when active file changes
     this.registerEvent(

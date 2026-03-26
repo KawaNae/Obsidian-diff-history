@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type DiffHistoryPlugin from "./main";
 import type { HistoryEntry } from "./history-manager";
+import type { FileSnapshot } from "./types";
 import { ConfirmModal } from "./confirm-modal";
 import { DiffCompareModal } from "./diff-view";
 import { formatTime, formatDate, groupBy } from "./utils";
@@ -10,6 +11,7 @@ export const VIEW_TYPE_DIFF_HISTORY = "diff-history-view";
 export class DiffHistoryView extends ItemView {
   private currentFile: string | null = null;
   private entries: HistoryEntry[] = [];
+  private snapshot: FileSnapshot | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: DiffHistoryPlugin) {
     super(leaf);
@@ -42,6 +44,7 @@ export class DiffHistoryView extends ItemView {
   async showFileHistory(filePath: string): Promise<void> {
     this.currentFile = filePath;
     this.entries = await this.plugin.historyManager.getFileHistory(filePath);
+    this.snapshot = (await this.plugin.historyManager.getSnapshot(filePath)) ?? null;
     // Reverse to show newest first
     this.entries.reverse();
     this.render();
@@ -53,7 +56,7 @@ export class DiffHistoryView extends ItemView {
 
     const container = contentEl.createDiv({ cls: "diff-history-view" });
 
-    if (!this.currentFile || this.entries.length === 0) {
+    if (!this.currentFile) {
       this.renderEmpty();
       return;
     }
@@ -62,6 +65,25 @@ export class DiffHistoryView extends ItemView {
     const header = container.createDiv({ cls: "diff-history-file-header" });
     const fileName = this.currentFile.split("/").pop() || this.currentFile;
     header.createEl("strong", { text: fileName });
+
+    if (this.entries.length === 0 && this.snapshot) {
+      // Has snapshot but no diffs yet — show initial tracking message
+      const info = container.createDiv({ cls: "diff-history-initial" });
+      info.createDiv({
+        cls: "diff-history-initial-text",
+        text: `Tracking started at ${formatTime(this.snapshot.lastModified)}`,
+      });
+      info.createDiv({
+        cls: "diff-history-initial-hint",
+        text: "Changes will appear here after the next edit.",
+      });
+      return;
+    }
+
+    if (this.entries.length === 0) {
+      this.renderEmpty();
+      return;
+    }
 
     // Group by date
     const groups = groupBy(this.entries, (e) =>

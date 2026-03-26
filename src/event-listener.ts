@@ -12,6 +12,7 @@ export class EventListener {
   private paused = false;
 
   onDiffSaved?: (filePath: string) => void;
+  onSnapshotCreated?: (filePath: string) => void;
 
   constructor(
     private vault: Vault,
@@ -131,6 +132,9 @@ export class EventListener {
 
         // Notify listeners
         this.onDiffSaved?.(file.path);
+      } else {
+        // First time seeing this file — notify for initial snapshot
+        this.onSnapshotCreated?.(file.path);
       }
 
       // Always update the snapshot to latest

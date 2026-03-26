@@ -25,6 +25,10 @@ export class HistoryManager {
     this.eventListener = listener;
   }
 
+  async getSnapshot(filePath: string) {
+    return this.storage.getSnapshot(filePath);
+  }
+
   async getFileHistory(filePath: string): Promise<HistoryEntry[]> {
     const diffs = await this.storage.getDiffs(filePath);
     return diffs.map((record) => {
