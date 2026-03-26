@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-diff-history",
+  "name": "Diff History",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Automatically saves file diffs over time. Restore previous versions with a Git-like diff viewer. Works on mobile.",
+  "author": "KawaNae",
+  "authorUrl": "https://github.com/KawaNae",
+  "isDesktopOnly": false
+}
