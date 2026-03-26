@@ -6,8 +6,12 @@ import { minimatch } from "./utils";
 
 export class EventListener {
   private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private lastCaptureTime = new Map<string, number>();
+  private pendingCapture = new Map<string, ReturnType<typeof setTimeout>>();
   private eventRefs: EventRef[] = [];
   private paused = false;
+
+  onDiffSaved?: (filePath: string) => void;
 
   constructor(
     private vault: Vault,
@@ -52,6 +56,10 @@ export class EventListener {
       clearTimeout(timer);
     }
     this.debounceTimers.clear();
+    for (const timer of this.pendingCapture.values()) {
+      clearTimeout(timer);
+    }
+    this.pendingCapture.clear();
   }
 
   getEventRefs(): EventRef[] {
@@ -71,15 +79,38 @@ export class EventListener {
   }
 
   private scheduleCapture(file: TFile): void {
+    // Clear existing debounce timer
     const existing = this.debounceTimers.get(file.path);
     if (existing) clearTimeout(existing);
 
     const timer = setTimeout(() => {
       this.debounceTimers.delete(file.path);
-      this.captureChange(file);
+      this.tryCapture(file);
     }, this.getSettings().debounceMs);
 
     this.debounceTimers.set(file.path, timer);
+  }
+
+  private tryCapture(file: TFile): void {
+    const settings = this.getSettings();
+    const lastCapture = this.lastCaptureTime.get(file.path) ?? 0;
+    const elapsed = Date.now() - lastCapture;
+
+    if (elapsed >= settings.minIntervalMs) {
+      // Enough time has passed, capture now
+      this.captureChange(file);
+    } else {
+      // Too soon — schedule a deferred capture at the next eligible time
+      const existingPending = this.pendingCapture.get(file.path);
+      if (existingPending) clearTimeout(existingPending);
+
+      const delay = settings.minIntervalMs - elapsed;
+      const pendingTimer = setTimeout(() => {
+        this.pendingCapture.delete(file.path);
+        this.captureChange(file);
+      }, delay);
+      this.pendingCapture.set(file.path, pendingTimer);
+    }
   }
 
   private async captureChange(file: TFile): Promise<void> {
@@ -88,7 +119,6 @@ export class EventListener {
       const snapshot = await this.storage.getSnapshot(file.path);
 
       if (snapshot) {
-        // Compute diff from previous content
         if (snapshot.content === currentContent) return; // No actual change
 
         const patches = this.diffEngine.computePatch(
@@ -97,6 +127,10 @@ export class EventListener {
         );
         const baseHash = this.diffEngine.computeHash(snapshot.content);
         await this.storage.saveDiff(file.path, patches, baseHash);
+        this.lastCaptureTime.set(file.path, Date.now());
+
+        // Notify listeners
+        this.onDiffSaved?.(file.path);
       }
 
       // Always update the snapshot to latest

@@ -39,6 +39,20 @@ export class DiffHistorySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Minimum interval (seconds)")
+      .setDesc("Minimum time between consecutive saves for the same file. Prevents excessive history entries.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(10, 300, 10)
+          .setValue(this.plugin.settings.minIntervalMs / 1000)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.minIntervalMs = value * 1000;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Exclude patterns")
       .setDesc("Glob patterns for files/folders to exclude (one per line). Example: templates/**")
       .addTextArea((text) =>

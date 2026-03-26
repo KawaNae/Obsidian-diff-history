@@ -38,6 +38,11 @@ export default class DiffHistoryPlugin extends Plugin {
     );
     this.historyManager.setEventListener(this.eventListener);
 
+    // Real-time update: refresh sidebar when a diff is saved
+    this.eventListener.onDiffSaved = (filePath) => {
+      this.refreshHistoryViewIfMatch(filePath);
+    };
+
     // Start event listening
     this.eventListener.start();
     for (const ref of this.eventListener.getEventRefs()) {
@@ -50,6 +55,26 @@ export default class DiffHistoryPlugin extends Plugin {
     // Register sidebar view
     this.registerView(VIEW_TYPE_DIFF_HISTORY, (leaf) => {
       return new DiffHistoryView(leaf, this);
+    });
+
+    // Auto-switch history when active file changes
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        const file = this.app.workspace.getActiveFile();
+        if (file) {
+          this.refreshHistoryViewIfMatch(file.path, true);
+        }
+      })
+    );
+
+    // Ribbon icon to open history sidebar
+    this.addRibbonIcon("history", "Diff History", () => {
+      const file = this.app.workspace.getActiveFile();
+      if (file) {
+        this.showHistory(file);
+      } else {
+        new Notice("No active file.");
+      }
     });
 
     // Register commands
@@ -124,6 +149,16 @@ export default class DiffHistoryPlugin extends Plugin {
 
     const view = leaf.view as DiffHistoryView;
     await view.showFileHistory(file.path);
+  }
+
+  private refreshHistoryViewIfMatch(filePath: string, alwaysRefresh = false): void {
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DIFF_HISTORY);
+    if (leaves.length === 0) return;
+
+    const view = leaves[0].view as DiffHistoryView;
+    if (alwaysRefresh || view.getCurrentFile() === filePath) {
+      view.showFileHistory(filePath);
+    }
   }
 
   private async clearFileHistory(file: TFile): Promise<void> {

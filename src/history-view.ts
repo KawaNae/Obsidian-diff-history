@@ -35,9 +35,15 @@ export class DiffHistoryView extends ItemView {
     this.contentEl.empty();
   }
 
+  getCurrentFile(): string | null {
+    return this.currentFile;
+  }
+
   async showFileHistory(filePath: string): Promise<void> {
     this.currentFile = filePath;
     this.entries = await this.plugin.historyManager.getFileHistory(filePath);
+    // Reverse to show newest first
+    this.entries.reverse();
     this.render();
   }
 
