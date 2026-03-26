@@ -1,0 +1,95 @@
+/* Diff History Plugin Styles */
+
+/* History sidebar */
+.diff-history-view {
+  padding: 8px;
+}
+
+.diff-history-date-group {
+  margin-bottom: 12px;
+}
+
+.diff-history-date-header {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.diff-history-entry {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.diff-history-entry:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.diff-history-entry.is-active {
+  background-color: var(--background-modifier-active-hover);
+}
+
+.diff-history-time {
+  color: var(--text-muted);
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-history-summary {
+  color: var(--text-normal);
+}
+
+.diff-history-additions {
+  color: var(--color-green);
+  margin-right: 4px;
+}
+
+.diff-history-deletions {
+  color: var(--color-red);
+}
+
+.diff-history-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 16px;
+  text-align: center;
+}
+
+.diff-history-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Diff preview in editor */
+.diff-history-added-line {
+  background-color: rgba(0, 180, 0, 0.15);
+}
+
+.diff-history-removed-line {
+  background-color: rgba(220, 0, 0, 0.15);
+  text-decoration: line-through;
+}
+
+.diff-history-added-line::after {
+  content: "+";
+  position: absolute;
+  left: 4px;
+  color: var(--color-green);
+  font-weight: bold;
+}
+
+.diff-history-removed-line::after {
+  content: "-";
+  position: absolute;
+  left: 4px;
+  color: var(--color-red);
+  font-weight: bold;
+}

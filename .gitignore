@@ -3,5 +3,5 @@ node_modules
 dist
 data.json
 main.js
-styles.css
+/styles.css
 *.log
