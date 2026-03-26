@@ -7,6 +7,7 @@ import { minimatch } from "./utils";
 export class EventListener {
   private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private eventRefs: EventRef[] = [];
+  private paused = false;
 
   constructor(
     private vault: Vault,
@@ -15,8 +16,17 @@ export class EventListener {
     private getSettings: () => DiffHistorySettings
   ) {}
 
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
   start(): void {
     const modifyRef = this.vault.on("modify", (file: TAbstractFile) => {
+      if (this.paused) return;
       if (!this.isTargetFile(file)) return;
       this.scheduleCapture(file as TFile);
     });

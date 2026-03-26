@@ -1,6 +1,7 @@
 import type { Vault, TFile } from "obsidian";
 import { DiffEngine } from "./diff-engine";
 import { StorageManager } from "./storage";
+import type { EventListener } from "./event-listener";
 import type { DiffRecord, DiffHistorySettings } from "./types";
 
 export interface HistoryEntry {
@@ -11,6 +12,7 @@ export interface HistoryEntry {
 
 export class HistoryManager {
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private eventListener: EventListener | null = null;
 
   constructor(
     private vault: Vault,
@@ -18,6 +20,10 @@ export class HistoryManager {
     private diffEngine: DiffEngine,
     private getSettings: () => DiffHistorySettings
   ) {}
+
+  setEventListener(listener: EventListener): void {
+    this.eventListener = listener;
+  }
 
   async getFileHistory(filePath: string): Promise<HistoryEntry[]> {
     const diffs = await this.storage.getDiffs(filePath);
@@ -66,7 +72,16 @@ export class HistoryManager {
     const file = this.vault.getAbstractFileByPath(filePath);
     if (!file || !("extension" in file)) return false;
 
-    await this.vault.modify(file as TFile, reconstructed);
+    // Pause event listener to prevent re-capturing the restore as a new diff
+    this.eventListener?.pause();
+    try {
+      await this.vault.modify(file as TFile, reconstructed);
+      // Update the snapshot to the restored content
+      await this.storage.saveSnapshot(filePath, reconstructed);
+    } finally {
+      // Resume after a tick to let the editor settle
+      setTimeout(() => this.eventListener?.resume(), 500);
+    }
     return true;
   }
 

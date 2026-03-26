@@ -1,76 +1,178 @@
-import {
-  Decoration,
-  DecorationSet,
-  EditorView,
-  ViewPlugin,
-  ViewUpdate,
-} from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
+import { App, Modal } from "obsidian";
 import DiffMatchPatch from "diff-match-patch";
 
 const dmp = new DiffMatchPatch();
 
-const addedLineDeco = Decoration.line({ class: "diff-history-added-line" });
-const removedLineDeco = Decoration.line({
-  class: "diff-history-removed-line",
-});
-
-interface DiffState {
-  oldText: string | null;
-}
-
-const diffState: DiffState = { oldText: null };
-
-export function setDiffCompareText(text: string | null): void {
-  diffState.oldText = text;
-}
-
-function buildDecorations(view: EditorView): DecorationSet {
-  if (!diffState.oldText) return Decoration.none;
-
-  const currentText = view.state.doc.toString();
-  const diffs = dmp.diff_main(diffState.oldText, currentText);
-  dmp.diff_cleanupSemantic(diffs);
-
-  const builder = new RangeSetBuilder<Decoration>();
-  let pos = 0;
-
-  for (const [op, text] of diffs) {
-    if (op === DiffMatchPatch.DIFF_EQUAL) {
-      pos += text.length;
-    } else if (op === DiffMatchPatch.DIFF_INSERT) {
-      // Mark each line that contains inserted text
-      const startLine = view.state.doc.lineAt(pos);
-      const endPos = Math.min(pos + text.length, view.state.doc.length);
-      const endLine = view.state.doc.lineAt(endPos);
-
-      for (let lineNum = startLine.number; lineNum <= endLine.number; lineNum++) {
-        const line = view.state.doc.line(lineNum);
-        builder.add(line.from, line.from, addedLineDeco);
-      }
-      pos += text.length;
-    }
-    // DIFF_DELETE: text doesn't exist in current doc, skip (no pos advance)
+/**
+ * Side-by-side diff comparison modal.
+ * Shows old content on the left and new content on the right,
+ * with additions/deletions highlighted.
+ */
+export class DiffCompareModal extends Modal {
+  constructor(
+    app: App,
+    private oldText: string,
+    private newText: string,
+    private title: string
+  ) {
+    super(app);
   }
 
-  return builder.finish();
-}
+  onOpen(): void {
+    const { contentEl, modalEl } = this;
+    modalEl.addClass("diff-history-compare-modal");
 
-export const diffHighlightPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+    contentEl.createEl("h3", { text: this.title });
 
-    constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
-    }
+    const diffs = dmp.diff_main(this.oldText, this.newText);
+    dmp.diff_cleanupSemantic(diffs);
 
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildDecorations(update.view);
+    const container = contentEl.createDiv({ cls: "diff-compare-container" });
+
+    // Left panel (old)
+    const leftPanel = container.createDiv({ cls: "diff-compare-panel diff-compare-left" });
+    leftPanel.createDiv({ cls: "diff-compare-panel-header", text: "Before" });
+    const leftContent = leftPanel.createDiv({ cls: "diff-compare-content" });
+
+    // Right panel (new)
+    const rightPanel = container.createDiv({ cls: "diff-compare-panel diff-compare-right" });
+    rightPanel.createDiv({ cls: "diff-compare-panel-header", text: "After" });
+    const rightContent = rightPanel.createDiv({ cls: "diff-compare-content" });
+
+    // Build side-by-side content from diffs
+    this.buildSideBySide(diffs, leftContent, rightContent);
+
+    // Sync scrolling
+    leftContent.addEventListener("scroll", () => {
+      rightContent.scrollTop = leftContent.scrollTop;
+    });
+    rightContent.addEventListener("scroll", () => {
+      leftContent.scrollTop = rightContent.scrollTop;
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+
+  private buildSideBySide(
+    diffs: DiffMatchPatch.Diff[],
+    leftEl: HTMLElement,
+    rightEl: HTMLElement
+  ): void {
+    // Convert diffs into line-based representation
+    const oldLines = this.oldText.split("\n");
+    const newLines = this.newText.split("\n");
+
+    // Use line-level diff for cleaner side-by-side
+    const lineDiffs = this.computeLineDiffs(oldLines, newLines);
+
+    let leftLineNum = 1;
+    let rightLineNum = 1;
+
+    for (const chunk of lineDiffs) {
+      if (chunk.type === "equal") {
+        for (const line of chunk.lines) {
+          this.addLine(leftEl, leftLineNum++, line, "");
+          this.addLine(rightEl, rightLineNum++, line, "");
+        }
+      } else if (chunk.type === "delete") {
+        for (const line of chunk.lines) {
+          this.addLine(leftEl, leftLineNum++, line, "diff-line-removed");
+          this.addLine(rightEl, null, "", "diff-line-placeholder");
+        }
+      } else if (chunk.type === "insert") {
+        for (const line of chunk.lines) {
+          this.addLine(leftEl, null, "", "diff-line-placeholder");
+          this.addLine(rightEl, rightLineNum++, line, "diff-line-added");
+        }
       }
     }
-  },
-  {
-    decorations: (v) => v.decorations,
   }
-);
+
+  private addLine(
+    container: HTMLElement,
+    lineNum: number | null,
+    text: string,
+    cls: string
+  ): void {
+    const row = container.createDiv({ cls: `diff-line ${cls}` });
+    row.createSpan({
+      cls: "diff-line-num",
+      text: lineNum != null ? String(lineNum) : "",
+    });
+    row.createSpan({
+      cls: "diff-line-text",
+      text: text || "\u00A0", // non-breaking space for empty lines
+    });
+  }
+
+  private computeLineDiffs(
+    oldLines: string[],
+    newLines: string[]
+  ): Array<{ type: "equal" | "insert" | "delete"; lines: string[] }> {
+    // Use diff-match-patch on joined lines with a line-mode trick
+    const { chars1, chars2, lineArray } = this.linesToChars(oldLines, newLines);
+    const charDiffs = dmp.diff_main(chars1, chars2, false);
+    dmp.diff_cleanupSemantic(charDiffs);
+
+    const result: Array<{
+      type: "equal" | "insert" | "delete";
+      lines: string[];
+    }> = [];
+
+    for (const [op, chars] of charDiffs) {
+      const lines: string[] = [];
+      for (let i = 0; i < chars.length; i++) {
+        const idx = chars.charCodeAt(i);
+        if (idx < lineArray.length) {
+          lines.push(lineArray[idx]);
+        }
+      }
+
+      let type: "equal" | "insert" | "delete";
+      if (op === DiffMatchPatch.DIFF_EQUAL) {
+        type = "equal";
+      } else if (op === DiffMatchPatch.DIFF_INSERT) {
+        type = "insert";
+      } else {
+        type = "delete";
+      }
+      result.push({ type, lines });
+    }
+
+    return result;
+  }
+
+  /**
+   * Encode each line as a unique character so diff-match-patch
+   * operates on whole lines instead of characters.
+   */
+  private linesToChars(
+    oldLines: string[],
+    newLines: string[]
+  ): { chars1: string; chars2: string; lineArray: string[] } {
+    const lineArray: string[] = [""];
+    const lineHash = new Map<string, number>();
+
+    const encode = (lines: string[]): string => {
+      let chars = "";
+      for (const line of lines) {
+        let idx = lineHash.get(line);
+        if (idx === undefined) {
+          idx = lineArray.length;
+          lineHash.set(line, idx);
+          lineArray.push(line);
+        }
+        chars += String.fromCharCode(idx);
+      }
+      return chars;
+    };
+
+    return {
+      chars1: encode(oldLines),
+      chars2: encode(newLines),
+      lineArray,
+    };
+  }
+}

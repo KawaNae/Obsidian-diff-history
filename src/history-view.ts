@@ -1,6 +1,8 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type DiffHistoryPlugin from "./main";
 import type { HistoryEntry } from "./history-manager";
+import { ConfirmModal } from "./confirm-modal";
+import { DiffCompareModal } from "./diff-view";
 import { formatTime, formatDate, groupBy } from "./utils";
 
 export const VIEW_TYPE_DIFF_HISTORY = "diff-history-view";
@@ -85,8 +87,25 @@ export class DiffHistoryView extends ItemView {
           });
         }
 
-        row.addEventListener("click", () => {
-          this.onEntryClick(entry);
+        // Action buttons
+        const actions = row.createSpan({ cls: "diff-history-entry-actions" });
+
+        const diffBtn = actions.createEl("button", {
+          cls: "diff-history-btn diff-history-btn-diff",
+          text: "Diff",
+        });
+        diffBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.onShowDiff(entry);
+        });
+
+        const restoreBtn = actions.createEl("button", {
+          cls: "diff-history-btn diff-history-btn-restore",
+          text: "Restore",
+        });
+        restoreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.onRestore(entry);
         });
       }
     }
@@ -102,7 +121,7 @@ export class DiffHistoryView extends ItemView {
     });
   }
 
-  private async onEntryClick(entry: HistoryEntry): Promise<void> {
+  private async onShowDiff(entry: HistoryEntry): Promise<void> {
     if (!this.currentFile) return;
 
     const reconstructed = await this.plugin.historyManager.reconstructAtPoint(
@@ -115,8 +134,36 @@ export class DiffHistoryView extends ItemView {
       return;
     }
 
-    // Show confirmation dialog
-    const confirmed = await this.confirmRestore(entry);
+    // Get current content
+    const file = this.plugin.app.vault.getAbstractFileByPath(this.currentFile);
+    if (!file || !("extension" in file)) return;
+    const currentContent = await this.plugin.app.vault.cachedRead(
+      file as import("obsidian").TFile
+    );
+
+    const time = formatTime(entry.record.timestamp);
+    const date = formatDate(entry.record.timestamp);
+
+    new DiffCompareModal(
+      this.plugin.app,
+      reconstructed,
+      currentContent,
+      `${date} ${time} vs Current`
+    ).open();
+  }
+
+  private async onRestore(entry: HistoryEntry): Promise<void> {
+    if (!this.currentFile) return;
+
+    const time = formatTime(entry.record.timestamp);
+    const date = formatDate(entry.record.timestamp);
+
+    const confirmed = await new ConfirmModal(
+      this.plugin.app,
+      "Restore file",
+      `Restore to ${date} ${time}? A new history entry will be created for the current state.`
+    ).waitForResult();
+
     if (!confirmed) return;
 
     const success = await this.plugin.historyManager.restoreToPoint(
@@ -126,24 +173,9 @@ export class DiffHistoryView extends ItemView {
 
     if (success) {
       new Notice("File restored successfully.");
-      // Refresh the history view
       await this.showFileHistory(this.currentFile);
     } else {
       new Notice("Failed to restore file.");
     }
-  }
-
-  private confirmRestore(entry: HistoryEntry): Promise<boolean> {
-    return new Promise((resolve) => {
-      const time = formatTime(entry.record.timestamp);
-      const date = formatDate(entry.record.timestamp);
-      const msg = `Restore file to ${date} ${time}?\nThis will create a new entry in the history.`;
-
-      if (confirm(msg)) {
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    });
   }
 }

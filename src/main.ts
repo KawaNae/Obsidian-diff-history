@@ -9,7 +9,6 @@ import {
   DiffHistoryView,
   VIEW_TYPE_DIFF_HISTORY,
 } from "./history-view";
-import { setDiffCompareText, diffHighlightPlugin } from "./diff-view";
 
 export default class DiffHistoryPlugin extends Plugin {
   settings: DiffHistorySettings = { ...DEFAULT_SETTINGS };
@@ -37,6 +36,7 @@ export default class DiffHistoryPlugin extends Plugin {
       this.diffEngine,
       () => this.settings
     );
+    this.historyManager.setEventListener(this.eventListener);
 
     // Start event listening
     this.eventListener.start();
@@ -46,9 +46,6 @@ export default class DiffHistoryPlugin extends Plugin {
 
     // Start cleanup timer
     this.historyManager.startCleanup();
-
-    // Register CM6 extension for diff highlighting
-    this.registerEditorExtension(diffHighlightPlugin);
 
     // Register sidebar view
     this.registerView(VIEW_TYPE_DIFF_HISTORY, (leaf) => {
@@ -96,7 +93,6 @@ export default class DiffHistoryPlugin extends Plugin {
   onunload() {
     this.eventListener?.stop();
     this.historyManager?.stopCleanup();
-    setDiffCompareText(null);
     this.storage?.close();
   }
 
@@ -114,7 +110,6 @@ export default class DiffHistoryPlugin extends Plugin {
   }
 
   private async showHistory(file: TFile): Promise<void> {
-    // Ensure the view is open
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_DIFF_HISTORY)[0];
     if (!leaf) {
       const rightLeaf = this.app.workspace.getRightLeaf(false);
