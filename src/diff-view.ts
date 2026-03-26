@@ -13,7 +13,9 @@ export class DiffCompareModal extends Modal {
     app: App,
     private oldText: string,
     private newText: string,
-    private title: string
+    private title: string,
+    private leftLabel = "Before",
+    private rightLabel = "After"
   ) {
     super(app);
   }
@@ -31,12 +33,12 @@ export class DiffCompareModal extends Modal {
 
     // Left panel (old)
     const leftPanel = container.createDiv({ cls: "diff-compare-panel diff-compare-left" });
-    leftPanel.createDiv({ cls: "diff-compare-panel-header", text: "Before" });
+    leftPanel.createDiv({ cls: "diff-compare-panel-header", text: this.leftLabel });
     const leftContent = leftPanel.createDiv({ cls: "diff-compare-content" });
 
     // Right panel (new)
     const rightPanel = container.createDiv({ cls: "diff-compare-panel diff-compare-right" });
-    rightPanel.createDiv({ cls: "diff-compare-panel-header", text: "After" });
+    rightPanel.createDiv({ cls: "diff-compare-panel-header", text: this.rightLabel });
     const rightContent = rightPanel.createDiv({ cls: "diff-compare-content" });
 
     // Build side-by-side content from diffs

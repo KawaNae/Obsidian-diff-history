@@ -154,7 +154,9 @@ export class DiffHistoryView extends ItemView {
       this.plugin.app,
       reconstructed,
       currentContent,
-      `${date} ${time} vs Current`
+      `${date} ${time} vs Current`,
+      `${date} ${time}`,
+      "Current"
     ).open();
   }
 
