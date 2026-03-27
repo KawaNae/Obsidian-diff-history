@@ -13,42 +13,45 @@ export class DiffHistorySettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Retention period (days)")
       .setDesc("How many days to keep diff history. Older records are automatically deleted.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(1, 90, 1)
-          .setValue(this.plugin.settings.retentionDays)
-          .setDynamicTooltip()
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.retentionDays))
           .onChange(async (value) => {
-            this.plugin.settings.retentionDays = value;
-            await this.plugin.saveSettings();
+            const num = parseInt(value, 10);
+            if (!isNaN(num) && num >= 1) {
+              this.plugin.settings.retentionDays = num;
+              await this.plugin.saveSettings();
+            }
           })
       );
 
     new Setting(containerEl)
       .setName("Debounce interval (seconds)")
       .setDesc("Wait this long after the last edit before saving a diff. Prevents excessive saves during rapid typing.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(1, 30, 1)
-          .setValue(this.plugin.settings.debounceMs / 1000)
-          .setDynamicTooltip()
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.debounceMs / 1000))
           .onChange(async (value) => {
-            this.plugin.settings.debounceMs = value * 1000;
-            await this.plugin.saveSettings();
+            const num = parseFloat(value);
+            if (!isNaN(num) && num >= 1) {
+              this.plugin.settings.debounceMs = num * 1000;
+              await this.plugin.saveSettings();
+            }
           })
       );
 
     new Setting(containerEl)
       .setName("Minimum interval (seconds)")
       .setDesc("Minimum time between consecutive saves for the same file. Prevents excessive history entries.")
-      .addSlider((slider) =>
-        slider
-          .setLimits(10, 300, 10)
-          .setValue(this.plugin.settings.minIntervalMs / 1000)
-          .setDynamicTooltip()
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.minIntervalMs / 1000))
           .onChange(async (value) => {
-            this.plugin.settings.minIntervalMs = value * 1000;
-            await this.plugin.saveSettings();
+            const num = parseFloat(value);
+            if (!isNaN(num) && num >= 1) {
+              this.plugin.settings.minIntervalMs = num * 1000;
+              await this.plugin.saveSettings();
+            }
           })
       );
 

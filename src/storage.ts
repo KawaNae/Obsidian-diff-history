@@ -24,13 +24,17 @@ export class StorageManager {
   async saveDiff(
     filePath: string,
     patches: string,
-    baseHash: string
+    baseHash: string,
+    added: number,
+    removed: number
   ): Promise<void> {
     await this.db.diffs.add({
       filePath,
       timestamp: Date.now(),
       patches,
       baseHash,
+      added,
+      removed,
     });
   }
 

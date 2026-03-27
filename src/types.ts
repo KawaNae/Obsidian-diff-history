@@ -4,6 +4,8 @@ export interface DiffRecord {
   timestamp: number;
   patches: string;
   baseHash: string;
+  added?: number;
+  removed?: number;
 }
 
 export interface FileSnapshot {

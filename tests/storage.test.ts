@@ -17,8 +17,8 @@ describe("StorageManager", () => {
 
   describe("saveDiff / getDiffs", () => {
     it("should save and retrieve diffs for a file", async () => {
-      await storage.saveDiff("notes/test.md", "patch1", "hash1");
-      await storage.saveDiff("notes/test.md", "patch2", "hash2");
+      await storage.saveDiff("notes/test.md", "patch1", "hash1", 1, 0);
+      await storage.saveDiff("notes/test.md", "patch2", "hash2", 0, 1);
 
       const diffs = await storage.getDiffs("notes/test.md");
       expect(diffs).toHaveLength(2);
@@ -27,8 +27,8 @@ describe("StorageManager", () => {
     });
 
     it("should isolate diffs by file path", async () => {
-      await storage.saveDiff("file-a.md", "patchA", "hashA");
-      await storage.saveDiff("file-b.md", "patchB", "hashB");
+      await storage.saveDiff("file-a.md", "patchA", "hashA", 1, 0);
+      await storage.saveDiff("file-b.md", "patchB", "hashB", 2, 0);
 
       const diffsA = await storage.getDiffs("file-a.md");
       const diffsB = await storage.getDiffs("file-b.md");
@@ -39,12 +39,12 @@ describe("StorageManager", () => {
     });
 
     it("should filter diffs by since timestamp", async () => {
-      await storage.saveDiff("test.md", "old", "h1");
+      await storage.saveDiff("test.md", "old", "h1", 1, 0);
       // Small delay to ensure different timestamps
       await new Promise((r) => setTimeout(r, 10));
       const midpoint = Date.now();
       await new Promise((r) => setTimeout(r, 10));
-      await storage.saveDiff("test.md", "new", "h2");
+      await storage.saveDiff("test.md", "new", "h2", 0, 1);
 
       const recent = await storage.getDiffs("test.md", midpoint);
       expect(recent).toHaveLength(1);
@@ -76,11 +76,11 @@ describe("StorageManager", () => {
 
   describe("deleteBefore", () => {
     it("should delete old diffs", async () => {
-      await storage.saveDiff("test.md", "old", "h1");
+      await storage.saveDiff("test.md", "old", "h1", 1, 0);
       await new Promise((r) => setTimeout(r, 10));
       const cutoff = Date.now();
       await new Promise((r) => setTimeout(r, 10));
-      await storage.saveDiff("test.md", "new", "h2");
+      await storage.saveDiff("test.md", "new", "h2", 0, 1);
 
       const deleted = await storage.deleteBefore(cutoff);
       expect(deleted).toBe(1);
@@ -93,10 +93,10 @@ describe("StorageManager", () => {
 
   describe("deleteByFile", () => {
     it("should delete all diffs and snapshot for a file", async () => {
-      await storage.saveDiff("target.md", "p1", "h1");
-      await storage.saveDiff("target.md", "p2", "h2");
+      await storage.saveDiff("target.md", "p1", "h1", 1, 0);
+      await storage.saveDiff("target.md", "p2", "h2", 0, 1);
       await storage.saveSnapshot("target.md", "content");
-      await storage.saveDiff("other.md", "p3", "h3");
+      await storage.saveDiff("other.md", "p3", "h3", 1, 1);
 
       const deleted = await storage.deleteByFile("target.md");
       expect(deleted).toBe(2);
@@ -114,8 +114,8 @@ describe("StorageManager", () => {
 
   describe("deleteAll", () => {
     it("should clear everything", async () => {
-      await storage.saveDiff("a.md", "p1", "h1");
-      await storage.saveDiff("b.md", "p2", "h2");
+      await storage.saveDiff("a.md", "p1", "h1", 1, 0);
+      await storage.saveDiff("b.md", "p2", "h2", 0, 1);
       await storage.saveSnapshot("a.md", "content");
 
       await storage.deleteAll();
@@ -131,7 +131,7 @@ describe("StorageManager", () => {
 
   describe("renamePath", () => {
     it("should update filePath in diffs and snapshots", async () => {
-      await storage.saveDiff("old-name.md", "p1", "h1");
+      await storage.saveDiff("old-name.md", "p1", "h1", 2, 0);
       await storage.saveSnapshot("old-name.md", "content");
 
       await storage.renamePath("old-name.md", "new-name.md");
@@ -152,9 +152,9 @@ describe("StorageManager", () => {
 
   describe("getStorageEstimate", () => {
     it("should return count and oldest timestamp", async () => {
-      await storage.saveDiff("a.md", "p1", "h1");
+      await storage.saveDiff("a.md", "p1", "h1", 1, 0);
       await new Promise((r) => setTimeout(r, 10));
-      await storage.saveDiff("b.md", "p2", "h2");
+      await storage.saveDiff("b.md", "p2", "h2", 0, 1);
 
       const estimate = await storage.getStorageEstimate();
       expect(estimate.count).toBe(2);

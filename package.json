@@ -1,6 +1,6 @@
 {
   "name": "obsidian-diff-history",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Obsidian plugin that saves file diffs over time for recovery and backup",
   "main": "main.js",
   "scripts": {

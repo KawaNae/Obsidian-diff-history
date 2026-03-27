@@ -37,13 +37,14 @@ function globToRegex(glob: string): RegExp {
 }
 
 /**
- * Format a timestamp to locale time string (HH:MM).
+ * Format a timestamp to locale time string (HH:MM:SS).
  */
 export function formatTime(timestamp: number): string {
   const d = new Date(timestamp);
   return d.toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
 }
 

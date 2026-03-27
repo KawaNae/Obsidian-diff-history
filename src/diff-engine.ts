@@ -64,12 +64,18 @@ export class DiffEngine {
     oldText: string,
     newText: string
   ): { added: number; removed: number } {
-    const diffs = dmp.diff_main(oldText, newText);
+    // Use line-level diff for git-consistent line counting
+    const { chars1, chars2, lineArray } = dmp.diff_linesToChars_(
+      oldText,
+      newText
+    );
+    const diffs = dmp.diff_main(chars1, chars2, false);
+    dmp.diff_charsToLines_(diffs, lineArray);
     dmp.diff_cleanupSemantic(diffs);
     let added = 0;
     let removed = 0;
     for (const [op, text] of diffs) {
-      const lines = (text.match(/\n/g) || []).length + (text.length > 0 ? 1 : 0);
+      const lines = (text.match(/\n/g) || []).length;
       if (op === DiffMatchPatch.DIFF_INSERT) {
         added += lines;
       } else if (op === DiffMatchPatch.DIFF_DELETE) {

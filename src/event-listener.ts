@@ -127,13 +127,25 @@ export class EventListener {
           currentContent
         );
         const baseHash = this.diffEngine.computeHash(snapshot.content);
-        await this.storage.saveDiff(file.path, patches, baseHash);
+        const { added, removed } = this.diffEngine.computeLineDiff(
+          snapshot.content,
+          currentContent
+        );
+        await this.storage.saveDiff(file.path, patches, baseHash, added, removed);
         this.lastCaptureTime.set(file.path, Date.now());
 
         // Notify listeners
         this.onDiffSaved?.(file.path);
       } else {
-        // First time seeing this file — notify for initial snapshot
+        // First time seeing this file — create initial diff from empty string
+        const patches = this.diffEngine.computePatch("", currentContent);
+        const baseHash = this.diffEngine.computeHash("");
+        const { added, removed } = this.diffEngine.computeLineDiff(
+          "",
+          currentContent
+        );
+        await this.storage.saveDiff(file.path, patches, baseHash, added, removed);
+        this.lastCaptureTime.set(file.path, Date.now());
         this.onSnapshotCreated?.(file.path);
       }
 

@@ -32,8 +32,9 @@ export class HistoryManager {
   async getFileHistory(filePath: string): Promise<HistoryEntry[]> {
     const diffs = await this.storage.getDiffs(filePath);
     return diffs.map((record) => {
-      // Estimate line changes from patch text
-      const { added, removed } = this.estimateChangesFromPatch(record.patches);
+      // Use stored values if available, fall back to estimation for legacy data
+      const added = record.added ?? this.estimateChangesFromPatch(record.patches).added;
+      const removed = record.removed ?? this.estimateChangesFromPatch(record.patches).removed;
       return { record, added, removed };
     });
   }
@@ -112,13 +113,11 @@ export class HistoryManager {
   private estimateChangesFromPatch(
     patchStr: string
   ): { added: number; removed: number } {
-    // Parse patch text to estimate additions/deletions
+    // Rough estimation from patch text for legacy data without stored line counts
     let added = 0;
     let removed = 0;
     const lines = patchStr.split("\n");
     for (const line of lines) {
-      // diff-match-patch format: lines starting with %2B (encoded +) are additions
-      // lines starting with %2D (encoded -) or - are deletions
       if (line.startsWith("+") || line.startsWith("%2B")) {
         added++;
       } else if (line.startsWith("-") || line.startsWith("%2D")) {

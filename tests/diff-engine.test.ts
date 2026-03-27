@@ -91,12 +91,34 @@ describe("DiffEngine", () => {
   });
 
   describe("computeLineDiff", () => {
-    it("should count added and removed lines", () => {
-      const old = "line1\nline2\nline3";
-      const next = "line1\nchanged\nline3\nline4";
+    it("should count added lines", () => {
+      const old = "aaa\nbbb\n";
+      const next = "aaa\nbbb\nccc\n";
       const diff = engine.computeLineDiff(old, next);
-      expect(diff.added).toBeGreaterThan(0);
-      expect(diff.removed).toBeGreaterThan(0);
+      expect(diff.added).toBe(1);
+      expect(diff.removed).toBe(0);
+    });
+
+    it("should count removed lines", () => {
+      const old = "aaa\nbbb\nccc\n";
+      const next = "aaa\nccc\n";
+      const diff = engine.computeLineDiff(old, next);
+      expect(diff.added).toBe(0);
+      expect(diff.removed).toBe(1);
+    });
+
+    it("should count all lines from empty", () => {
+      const diff = engine.computeLineDiff("", "aaa\nbbb\nccc\n");
+      expect(diff.added).toBe(3);
+      expect(diff.removed).toBe(0);
+    });
+
+    it("should count replaced lines as +1 -1", () => {
+      const old = "line1\nline2\nline3\n";
+      const next = "line1\nchanged\nline3\n";
+      const diff = engine.computeLineDiff(old, next);
+      expect(diff.added).toBe(1);
+      expect(diff.removed).toBe(1);
     });
 
     it("should return zero for identical texts", () => {

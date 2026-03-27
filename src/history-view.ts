@@ -1,7 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import type DiffHistoryPlugin from "./main";
 import type { HistoryEntry } from "./history-manager";
-import type { FileSnapshot } from "./types";
 import { ConfirmModal } from "./confirm-modal";
 import { DiffCompareModal } from "./diff-view";
 import { formatTime, formatDate, groupBy } from "./utils";
@@ -11,7 +10,6 @@ export const VIEW_TYPE_DIFF_HISTORY = "diff-history-view";
 export class DiffHistoryView extends ItemView {
   private currentFile: string | null = null;
   private entries: HistoryEntry[] = [];
-  private snapshot: FileSnapshot | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: DiffHistoryPlugin) {
     super(leaf);
@@ -44,7 +42,6 @@ export class DiffHistoryView extends ItemView {
   async showFileHistory(filePath: string): Promise<void> {
     this.currentFile = filePath;
     this.entries = await this.plugin.historyManager.getFileHistory(filePath);
-    this.snapshot = (await this.plugin.historyManager.getSnapshot(filePath)) ?? null;
     // Reverse to show newest first
     this.entries.reverse();
     this.render();
@@ -65,20 +62,6 @@ export class DiffHistoryView extends ItemView {
     const header = container.createDiv({ cls: "diff-history-file-header" });
     const fileName = this.currentFile.split("/").pop() || this.currentFile;
     header.createEl("strong", { text: fileName });
-
-    if (this.entries.length === 0 && this.snapshot) {
-      // Has snapshot but no diffs yet — show initial tracking message
-      const info = container.createDiv({ cls: "diff-history-initial" });
-      info.createDiv({
-        cls: "diff-history-initial-text",
-        text: `Tracking started at ${formatTime(this.snapshot.lastModified)}`,
-      });
-      info.createDiv({
-        cls: "diff-history-initial-hint",
-        text: "Changes will appear here after the next edit.",
-      });
-      return;
-    }
 
     if (this.entries.length === 0) {
       this.renderEmpty();
@@ -124,7 +107,8 @@ export class DiffHistoryView extends ItemView {
         });
         diffBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          this.onShowDiff(entry);
+          const index = this.entries.indexOf(entry);
+          this.onShowDiff(entry, index);
         });
 
         const restoreBtn = actions.createEl("button", {
@@ -149,7 +133,7 @@ export class DiffHistoryView extends ItemView {
     });
   }
 
-  private async onShowDiff(entry: HistoryEntry): Promise<void> {
+  private async onShowDiff(entry: HistoryEntry, index: number): Promise<void> {
     if (!this.currentFile) return;
 
     const reconstructed = await this.plugin.historyManager.reconstructAtPoint(
@@ -162,23 +146,39 @@ export class DiffHistoryView extends ItemView {
       return;
     }
 
-    // Get current content
-    const file = this.plugin.app.vault.getAbstractFileByPath(this.currentFile);
-    if (!file || !("extension" in file)) return;
-    const currentContent = await this.plugin.app.vault.cachedRead(
-      file as import("obsidian").TFile
-    );
+    let previousContent: string;
+    let leftLabel: string;
+
+    // Entries are sorted newest-first, so the chronologically previous entry is at index + 1
+    const prevIndex = index + 1;
+    if (prevIndex < this.entries.length) {
+      const prevEntry = this.entries[prevIndex];
+      const prev = await this.plugin.historyManager.reconstructAtPoint(
+        this.currentFile,
+        prevEntry.record.timestamp
+      );
+      if (prev === null) {
+        new Notice("Failed to reconstruct previous state.");
+        return;
+      }
+      previousContent = prev;
+      leftLabel = `${formatDate(prevEntry.record.timestamp)} ${formatTime(prevEntry.record.timestamp)}`;
+    } else {
+      previousContent = "";
+      leftLabel = "(empty)";
+    }
 
     const time = formatTime(entry.record.timestamp);
     const date = formatDate(entry.record.timestamp);
+    const rightLabel = `${date} ${time}`;
 
     new DiffCompareModal(
       this.plugin.app,
+      previousContent,
       reconstructed,
-      currentContent,
-      `${date} ${time} vs Current`,
-      `${date} ${time}`,
-      "Current"
+      `${leftLabel} → ${rightLabel}`,
+      leftLabel,
+      rightLabel
     ).open();
   }
 
